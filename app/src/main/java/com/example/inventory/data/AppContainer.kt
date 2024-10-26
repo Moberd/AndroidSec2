@@ -29,17 +29,10 @@ interface AppContainer {
  * [AppContainer] implementation that provides instance of [OfflineItemsRepository]
  */
 class AppDataContainer(private val context: Context) : AppContainer {
-
     /**
      * Implementation for [ItemsRepository]
      */
     override val itemsRepository: ItemsRepository by lazy {
-
-        /*val currentDatabaseFile = context.getDatabasePath("item_database_cipher")
-
-        if (currentDatabaseFile.exists())
-            context.deleteDatabase(currentDatabaseFile.name)*/
-
         OfflineItemsRepository(InventoryDatabase.getDatabase(context).itemDao())
     }
 }

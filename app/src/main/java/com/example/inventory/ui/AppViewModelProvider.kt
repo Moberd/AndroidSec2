@@ -17,7 +17,6 @@
 package com.example.inventory.ui
 
 import android.app.Application
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
@@ -28,7 +27,6 @@ import com.example.inventory.ui.home.HomeViewModel
 import com.example.inventory.ui.item.ItemDetailsViewModel
 import com.example.inventory.ui.item.ItemEditViewModel
 import com.example.inventory.ui.item.ItemEntryViewModel
-import com.example.inventory.ui.settings.SettingsViewModel
 
 /**
  * Provides Factory to create instance of ViewModel for the entire Inventory app
@@ -53,14 +51,6 @@ object AppViewModelProvider {
                 this.createSavedStateHandle(),
                 inventoryApplication().container.itemsRepository
             )
-        }
-
-        //Initializer for SettingsViewModel
-        initializer {
-            //val application = (this as? androidx.lifecycle.SavedStateHandle)?.get<Any>("application") as? Application
-               // ?: throw IllegalArgumentException("Application context is required")
-
-            SettingsViewModel()
         }
 
         // Initializer for HomeViewModel

@@ -82,18 +82,9 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
 
-    // Room
+    //Room
     implementation("androidx.room:room-runtime:${rootProject.extra["room_version"]}")
     ksp("androidx.room:room-compiler:${rootProject.extra["room_version"]}")
     implementation("androidx.room:room-ktx:${rootProject.extra["room_version"]}")
 
-    // Encrypting
-    implementation("androidx.security:security-crypto:1.1.0-alpha03")
-    implementation("com.google.code.gson:gson:2.8.8")
-    implementation(kotlin("script-runtime"))
-
-    // SQLCipher
-    implementation("com.commonsware.cwac:saferoom.x:1.2.1")
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
-    implementation("androidx.sqlite:sqlite-ktx:2.4.0")
 }

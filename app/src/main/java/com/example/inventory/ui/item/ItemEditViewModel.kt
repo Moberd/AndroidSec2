@@ -30,33 +30,6 @@ import kotlinx.coroutines.launch
 /**
  * ViewModel to retrieve and update an item from the [ItemsRepository]'s data source.
  */
-
-fun isCorrectPrice(price: String) : Boolean {
-    return price.toDoubleOrNull() != null
-}
-
-fun isCorrectQuantity(quantity: String) : Boolean {
-    return quantity.toIntOrNull() != null
-}
-
-fun isCorrectProviderName(name: String) : Boolean {
-    return name.isNotBlank() && name[0].isUpperCase()
-}
-
-fun isCorrectProviderEmail(email: String) : Boolean {
-    if(email.isNotBlank() && email.contains('@')){
-        val arr = email.split("@")
-        return arr[0].isNotEmpty() && arr[1].contains('.') && arr[1].last() != '.'
-    }
-    return false
-}
-
-fun isCorrectProviderPhoneNumber(phoneNumber: String) : Boolean {
-    val regex = Regex("^(\\d+[\\d-]*)*$")
-    return phoneNumber.isNotBlank() && regex.matches(phoneNumber) && phoneNumber.last() != '-'
-}
-
-
 class ItemEditViewModel(
     savedStateHandle: SavedStateHandle,
     private val itemsRepository: ItemsRepository
@@ -79,15 +52,6 @@ class ItemEditViewModel(
         }
     }
 
-    private fun validateInput(uiState: ItemDetails = itemUiState.itemDetails): Boolean {
-        return with(uiState) {
-            name.isNotBlank() && isCorrectPrice(price) && isCorrectQuantity(quantity)
-                    && isCorrectProviderName(providerName)
-                    && isCorrectProviderEmail(providerEmail)
-                    && isCorrectProviderPhoneNumber(providerPhoneNumber)
-        }
-    }
-
     fun updateUiState(itemDetails: ItemDetails) {
         itemUiState =
             ItemUiState(itemDetails = itemDetails, isEntryValid = validateInput(itemDetails))
@@ -96,6 +60,12 @@ class ItemEditViewModel(
     suspend fun updateItem() {
         if (validateInput(itemUiState.itemDetails)) {
             itemsRepository.updateItem(itemUiState.itemDetails.toItem())
+        }
+    }
+
+    private fun validateInput(uiState: ItemDetails = itemUiState.itemDetails): Boolean {
+        return with(uiState) {
+            name.isNotBlank() && price.isNotBlank() && quantity.isNotBlank()
         }
     }
 }

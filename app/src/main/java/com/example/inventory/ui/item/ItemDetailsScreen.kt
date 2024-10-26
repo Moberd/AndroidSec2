@@ -16,22 +16,15 @@
 
 package com.example.inventory.ui.item
 
-import android.app.Activity
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -68,8 +61,8 @@ import com.example.inventory.R
 import com.example.inventory.data.Item
 import com.example.inventory.ui.AppViewModelProvider
 import com.example.inventory.ui.navigation.NavigationDestination
-import com.example.inventory.ui.settings.SettingsViewModel
 import com.example.inventory.ui.theme.InventoryTheme
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 
 object ItemDetailsDestination : NavigationDestination {
@@ -87,15 +80,9 @@ fun ItemDetailsScreen(
     modifier: Modifier = Modifier,
     viewModel: ItemDetailsViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
-
     val uiState = viewModel.uiState.collectAsState()
-
     val coroutineScope = rememberCoroutineScope()
-
-    val context = LocalContext.current as Activity
-
-    if(editItemPage)
-        editItemPage = false
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -108,11 +95,7 @@ fun ItemDetailsScreen(
             FloatingActionButton(
                 onClick = { navigateToEditItem(uiState.value.itemDetails.id) },
                 shape = MaterialTheme.shapes.medium,
-                modifier = Modifier
-                    .padding(
-                        end = WindowInsets.safeDrawing.asPaddingValues()
-                            .calculateEndPadding(LocalLayoutDirection.current)
-                    )
+                modifier = Modifier.padding(dimensionResource(id = R.dimen.padding_large))
 
             ) {
                 Icon(
@@ -122,27 +105,16 @@ fun ItemDetailsScreen(
             }
         }, modifier = modifier
     ) { innerPadding ->
-
-        val saveFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument()) { uri: Uri? ->
-            uri?.let {
-                // Сохранение в кэш
-                val cacheFile = viewModel.saveProductToCache(context, uiState.value.itemDetails.toItem(), uri)
-                // Запись в Shared Storage
-                viewModel.writeCacheToSharedStorage(context, cacheFile, uri)
-            }
-        }
-
         ItemDetailsBody(
             itemDetailsUiState = uiState.value,
             onSellItem = { viewModel.reduceQuantityByOne() },
-            onShareItem = { viewModel.shareItem(context) },
-            onSaveToFile = { saveFileLauncher.launch("item") },
             onDelete = {
                 coroutineScope.launch {
                     viewModel.deleteItem()
                     navigateBack()
                 }
             },
+            onShare = { viewModel.shareItem(uiState.value.itemDetails.toItem(), context)},
             modifier = Modifier
                 .padding(
                     start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
@@ -158,9 +130,8 @@ fun ItemDetailsScreen(
 private fun ItemDetailsBody(
     itemDetailsUiState: ItemDetailsUiState,
     onSellItem: () -> Unit,
-    onShareItem: () -> Unit,
-    onSaveToFile: () -> Unit,
     onDelete: () -> Unit,
+    onShare: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -169,14 +140,9 @@ private fun ItemDetailsBody(
     ) {
         var deleteConfirmationRequired by rememberSaveable { mutableStateOf(false) }
 
-        val settings = SettingsViewModel()
-        val flagSensitiveData = settings.getCheckboxState(0)
-        val flagProhibitSendingData = settings.getCheckboxState(1)
-
         ItemDetails(
             item = itemDetailsUiState.itemDetails.toItem(),
-            modifier = Modifier.fillMaxWidth(),
-            flag = flagSensitiveData
+            modifier = Modifier.fillMaxWidth()
         )
         Button(
             onClick = onSellItem,
@@ -186,31 +152,19 @@ private fun ItemDetailsBody(
         ) {
             Text(stringResource(R.string.sell))
         }
-        Button(
-            onClick = onShareItem,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !flagProhibitSendingData
-        ) {
-
-            if(!flagProhibitSendingData)
-                Text(stringResource(R.string.share))
-            else
-                Text("Share (sending data is off with prohibit setting)")
-        }
-        Button(
-            onClick = onSaveToFile,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.save_action_to_file))
-        }
         OutlinedButton(
             onClick = { deleteConfirmationRequired = true },
             shape = MaterialTheme.shapes.small,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(stringResource(R.string.delete))
+        }
+        OutlinedButton(
+            onClick = onShare,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.share))
         }
         if (deleteConfirmationRequired) {
             DeleteConfirmationDialog(
@@ -227,7 +181,7 @@ private fun ItemDetailsBody(
 
 @Composable
 fun ItemDetails(
-    item: Item, modifier: Modifier = Modifier, flag: Boolean
+    item: Item, modifier: Modifier = Modifier
 ) {
     Card(
         modifier = modifier,
@@ -244,13 +198,6 @@ fun ItemDetails(
                 dimensionResource(id = R.dimen.padding_medium)
             )
         ) {
-            ItemDetailsRow(
-                labelResID = R.string.source,
-                itemDetail = item.createdBy.toString(),
-                modifier = Modifier.padding(
-                    horizontal = dimensionResource(id = R.dimen.padding_medium)
-                )
-            )
             ItemDetailsRow(
                 labelResID = R.string.item,
                 itemDetail = item.name,
@@ -273,34 +220,22 @@ fun ItemDetails(
                 )
             )
             ItemDetailsRow(
-                labelResID = R.string.provider_name,
-                itemDetail =
-                    if (flag)
-                        "*".repeat(item.sourceName.length)
-                    else
-                        item.sourceName,
+                labelResID = R.string.source_name,
+                itemDetail = item.sourceName,
                 modifier = Modifier.padding(
                     horizontal = dimensionResource(id = R.dimen.padding_medium)
                 )
             )
             ItemDetailsRow(
-                labelResID = R.string.provider_email,
-                itemDetail =
-                    if (flag)
-                        "*".repeat(item.sourceEmail.length)
-                    else
-                        item.sourceEmail,
+                labelResID = R.string.source_email,
+                itemDetail = item.sourceEmail,
                 modifier = Modifier.padding(
                     horizontal = dimensionResource(id = R.dimen.padding_medium)
                 )
             )
             ItemDetailsRow(
-                labelResID = R.string.provider_phone_number,
-                itemDetail =
-                    if (flag)
-                        "*".repeat(item.sourcePhone.length)
-                    else
-                        item.sourcePhone,
+                labelResID = R.string.source_phone,
+                itemDetail = item.sourcePhone,
                 modifier = Modifier.padding(
                     horizontal = dimensionResource(id = R.dimen.padding_medium)
                 )
@@ -311,8 +246,8 @@ fun ItemDetails(
 
 @Composable
 private fun ItemDetailsRow(
-    @StringRes labelResID: Int, itemDetail: String,
-    modifier: Modifier = Modifier) {
+    @StringRes labelResID: Int, itemDetail: String, modifier: Modifier = Modifier
+) {
     Row(modifier = modifier) {
         Text(stringResource(labelResID))
         Spacer(modifier = Modifier.weight(1f))
@@ -349,12 +284,11 @@ fun ItemDetailsScreenPreview() {
         ItemDetailsBody(
             ItemDetailsUiState(
                 outOfStock = true,
-                itemDetails = ItemDetails(1, "Pen", "$100", "10")
+                itemDetails = ItemDetails(1, "Pen", "$100", "10", "ErichKrause", "ek@gmail.com", "89999999991")
             ),
             onSellItem = {},
-            onShareItem = {},
-            onSaveToFile = {},
-            onDelete = {}
+            onDelete = {},
+            onShare = {},
         )
     }
 }
