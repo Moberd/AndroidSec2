@@ -34,15 +34,15 @@ abstract class InventoryDatabase: RoomDatabase() {
 
                 val passphrase: ByteArray = SQLiteDatabase.getBytes(stringKey.toCharArray())
 
-                val state = getDatabaseState(context, "item_database_cipher")
+                val state = getDatabaseState(context, "item_database")
 
                 if (state.toString() == "UNENCRYPTED"){
-                    encrypt(context, "item_database_cipher", passphrase)
+                    encrypt(context, "item_database", passphrase)
                 }
 
                 val factory = SupportFactory(passphrase)
 
-                Room.databaseBuilder(context, InventoryDatabase::class.java, "item_database_cipher")
+                Room.databaseBuilder(context, InventoryDatabase::class.java, "item_database")
                     .openHelperFactory(factory)
                     .fallbackToDestructiveMigration()
                     .build()
