@@ -37,6 +37,8 @@ import com.example.inventory.ui.navigation.NavigationDestination
 import com.example.inventory.ui.theme.InventoryTheme
 import kotlinx.coroutines.launch
 
+var editItemPage: Boolean = false
+
 object ItemEditDestination : NavigationDestination {
     override val route = "item_edit"
     override val titleRes = R.string.edit_item_title
@@ -52,7 +54,11 @@ fun ItemEditScreen(
     modifier: Modifier = Modifier,
     viewModel: ItemEditViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
+
     val coroutineScope = rememberCoroutineScope()
+
+    addItemPage = false
+    editItemPage = true
 
     Scaffold(
         topBar = {
@@ -70,9 +76,11 @@ fun ItemEditScreen(
             onSaveClick = {
                 coroutineScope.launch {
                     viewModel.updateItem()
+                    editItemPage = false
                     navigateBack()
                 }
             },
+            onLoadFromFileClick = {},
             modifier = Modifier
                 .padding(
                     start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),

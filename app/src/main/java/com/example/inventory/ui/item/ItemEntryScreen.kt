@@ -16,6 +16,9 @@
 
 package com.example.inventory.ui.item
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -39,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
@@ -49,6 +53,8 @@ import com.example.inventory.InventoryTopAppBar
 import com.example.inventory.R
 import com.example.inventory.ui.AppViewModelProvider
 import com.example.inventory.ui.navigation.NavigationDestination
+import com.example.inventory.ui.settings.SettingsViewModel
+import com.example.inventory.ui.settings.context
 import com.example.inventory.ui.theme.InventoryTheme
 import kotlinx.coroutines.launch
 import java.util.Currency
@@ -59,6 +65,9 @@ object ItemEntryDestination : NavigationDestination {
     override val titleRes = R.string.item_entry_title
 }
 
+var addItemPage : Boolean = false
+var flag: Boolean = false
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemEntryScreen(
@@ -68,6 +77,18 @@ fun ItemEntryScreen(
     viewModel: ItemEntryViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val coroutineScope = rememberCoroutineScope()
+
+    addItemPage = true
+    flag = false
+
+    val loadFileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri?.let {
+            coroutineScope.launch {
+                viewModel.loadFromFile(context, uri)
+                navigateBack()
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -87,6 +108,9 @@ fun ItemEntryScreen(
                     navigateBack()
                 }
             },
+            onLoadFromFileClick = {
+                loadFileLauncher.launch(arrayOf("application/octet-stream"))
+            },
             modifier = Modifier
                 .padding(
                     start = innerPadding.calculateStartPadding(LocalLayoutDirection.current),
@@ -104,8 +128,10 @@ fun ItemEntryBody(
     itemUiState: ItemUiState,
     onItemValueChange: (ItemDetails) -> Unit,
     onSaveClick: () -> Unit,
+    onLoadFromFileClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+
     Column(
         verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_large)),
         modifier = modifier.padding(dimensionResource(id = R.dimen.padding_medium))
@@ -123,6 +149,16 @@ fun ItemEntryBody(
         ) {
             Text(text = stringResource(R.string.save_action))
         }
+
+        if(addItemPage){
+            Button(
+                onClick = onLoadFromFileClick,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = stringResource(R.string.load_from_file))
+            }
+        }
     }
 }
 
@@ -137,111 +173,129 @@ fun ItemInputForm(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(dimensionResource(id = R.dimen.padding_medium))
     ) {
-        var isNameValid by remember { mutableStateOf(true) }
+        val isItemValid = itemDetails.name.isNotBlank()
+        val isPriceValid = isCorrectPrice(itemDetails.price)
+        val isQuantityValid = isCorrectQuantity(itemDetails.quantity)
+        val isProviderNameValid = isCorrectProviderName(itemDetails.providerName)
+        val isProviderEmailValid = isCorrectProviderEmail(itemDetails.providerEmail)
+        val isProviderPhoneNumberValid = isCorrectProviderPhoneNumber(itemDetails.providerPhoneNumber)
         OutlinedTextField(
             value = itemDetails.name,
-            onValueChange = {
-                onValueChange(itemDetails.copy(name = it))
-                isNameValid = ItemEntryViewModel.validateName(it)
-            },
+            onValueChange = { onValueChange(itemDetails.copy(name = it)) },
             label = { Text(stringResource(R.string.item_name_req)) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                focusedContainerColor =
+                if (isItemValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                unfocusedContainerColor =
+                if (isItemValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
                 disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             ),
-            isError = !isNameValid,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = true
         )
-        var isPriceValid by remember { mutableStateOf(true) }
         OutlinedTextField(
             value = itemDetails.price,
-            onValueChange = {
-                onValueChange(itemDetails.copy(price = it))
-                isPriceValid = ItemEntryViewModel.validatePrice(it)
-            },
+            onValueChange = { onValueChange(itemDetails.copy(price = it)) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             label = { Text(stringResource(R.string.item_price_req)) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                focusedContainerColor =
+                if (isPriceValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                unfocusedContainerColor =
+                if (isPriceValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
                 disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             ),
-            isError = !isPriceValid,
             leadingIcon = { Text(Currency.getInstance(Locale.getDefault()).symbol) },
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = true
         )
-        var isQuantityValid by remember { mutableStateOf(true) }
+
+        val settings = SettingsViewModel()
+
+        var flagDefaultQuantity by remember { mutableStateOf(settings.getCheckboxState(2)) }
+
+        val defQuantity = settings.quantityState ?: ""
+
+        val displayQuantity = if (flagDefaultQuantity && !editItemPage) defQuantity else itemDetails.quantity
+        if(flagDefaultQuantity && !flag){
+            itemDetails.quantity = defQuantity
+            flag = true
+        }
+
         OutlinedTextField(
-            value = itemDetails.quantity,
+            value = displayQuantity,
             onValueChange = {
+                flagDefaultQuantity = false
                 onValueChange(itemDetails.copy(quantity = it))
-                isQuantityValid = ItemEntryViewModel.validateQuantity(it)
-            },
+                            },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             label = { Text(stringResource(R.string.quantity_req)) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-            ),
-            isError = !isQuantityValid,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-            singleLine = true
-        )
-        OutlinedTextField(
-            value = itemDetails.sourceName,
-            onValueChange = { onValueChange(itemDetails.copy(sourceName = it)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-            label = { Text(stringResource(R.string.source_name)) },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                focusedContainerColor =
+                if (flagDefaultQuantity || isQuantityValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                unfocusedContainerColor =
+                if (flagDefaultQuantity || isQuantityValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
                 disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             ),
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = true
         )
-        var isEmailValid by remember { mutableStateOf(true) }
         OutlinedTextField(
-            value = itemDetails.sourceEmail,
-            onValueChange = {
-                onValueChange(itemDetails.copy(sourceEmail = it))
-                isEmailValid = ItemEntryViewModel.validateEmail(it)
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            label = { Text(stringResource(R.string.source_email)) },
+            value = itemDetails.providerName,
+            onValueChange = { onValueChange(itemDetails.copy(providerName = it)) },
+            label = { Text(stringResource(R.string.provider_name_req)) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                focusedContainerColor =
+                if (isProviderNameValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                unfocusedContainerColor =
+                if (isProviderNameValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
                 disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             ),
-            isError = !isEmailValid,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = true
         )
-        var isPhoneValid by remember { mutableStateOf(true) }
         OutlinedTextField(
-            value = itemDetails.sourcePhone,
-            onValueChange = {
-                onValueChange(itemDetails.copy(sourcePhone = it))
-                isPhoneValid = ItemEntryViewModel.validatePhone(it)
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            label = { Text(stringResource(R.string.source_phone)) },
+            value = itemDetails.providerEmail,
+            onValueChange = { onValueChange(itemDetails.copy(providerEmail = it)) },
+            label = { Text(stringResource(R.string.provider_email_req)) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                focusedContainerColor =
+                if (isProviderEmailValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                unfocusedContainerColor =
+                if (isProviderEmailValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
                 disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             ),
-            isError = !isPhoneValid,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled,
+            singleLine = true
+        )
+        OutlinedTextField(
+            value = itemDetails.providerPhoneNumber,
+            onValueChange = { onValueChange(itemDetails.copy(providerPhoneNumber = it)) },
+            label = { Text(stringResource(R.string.provider_phone_number_req)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor =
+                if (isProviderPhoneNumberValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                unfocusedContainerColor =
+                if (isProviderPhoneNumberValid) MaterialTheme.colorScheme.secondaryContainer
+                else Color(0xFFFFC0CB),
+                disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            ),
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
             singleLine = true
@@ -259,11 +313,10 @@ fun ItemInputForm(
 @Composable
 private fun ItemEntryScreenPreview() {
     InventoryTheme {
-        ItemEntryBody(
-            itemUiState = ItemUiState(
+        ItemEntryBody(itemUiState = ItemUiState(
             ItemDetails(
                 name = "Item name", price = "10.00", quantity = "5"
             )
-        ), onItemValueChange = {}, onSaveClick = {})
+        ), onItemValueChange = {}, onSaveClick = {}, onLoadFromFileClick = {})
     }
 }

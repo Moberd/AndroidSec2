@@ -19,7 +19,6 @@ package com.example.inventory.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-
 /**
  * Entity data class represents a single row in the database.
  */
@@ -33,15 +32,21 @@ data class Item(
     val sourceName: String,
     val sourceEmail: String,
     val sourcePhone: String,
+    var createdBy: Source = Source.MANUAL
 ) {
     override fun toString(): String {
         return """
-        Name: ${this.name}
-        Price: ${this.price}
-        Quantity: ${this.quantity}
-        Source Name: ${this.sourceName}
-        Source Email: ${this.sourceEmail}
-        Source Phone: ${this.sourcePhone}
-    """.trimIndent()
+            Name: ${this.name}
+            Price: ${this.price}
+            Quantity: ${this.quantity}
+            Source Name: ${this.sourceName}
+            Source Email: ${this.sourceEmail}
+            Source Phone: ${this.sourcePhone}
+        """.trimIndent()
     }
+}
+
+enum class Source{
+    MANUAL,
+    FILE
 }
